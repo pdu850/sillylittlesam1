@@ -106,7 +106,7 @@ class Projectile {
     this.y = y;
     this.width = 5;
     this.height = 16;
-    this.speed = 9;
+    this.speed = 11;
   }
 
   draw() {
@@ -256,7 +256,7 @@ function gameLoop() {
     }
 
     // Create projectile
-    if (currentTime - lastProjectileTime > 2000) {
+    if (currentTime - lastProjectileTime > 700) {
       projectile = new Projectile(sam.x + sam.width / 2, sam.y);
       lastProjectileTime = currentTime;
     }
