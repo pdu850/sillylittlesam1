@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Silly lil Sam: the game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+canvas {
+  display: block;
+}
+</style>
+</head>
+<body>
+
+<canvas id="myCanvas"></canvas>
+<audio id="beepSound" src="beep.mp3" preload="auto"></audio>
+<audio id="bgMusic" src="bg.mp3" preload="auto" loop></audio> 
+
+<script>
+const canvas = document.getElementById("myCanvas");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Disable right-click
+document.addEventListener('contextmenu', event => event.preventDefault());
+
+// Prevent double-tap zoom on mobile
+document.addEventListener('dblclick', event => event.preventDefault());
+
+// Game variables
+let sam;
+let obstacles = [];
+let score = 0;
+let gameOverFlag = false;
+let gameSpeed = 1;
+let lastObstacleTime = 0;
+let projectile = null;
+let lastProjectileTime = 0;
+
+// Load images
+const samImg = new Image();
+samImg.src = "Sam.png";
+const obstacleImgs = [
+  new Image(),
+  new Image(),
+  new Image()
+];
+obstacleImgs[0].src = "Sam1.png";
+obstacleImgs[1].src = "Sam2.png";
+obstacleImgs[2].src = "Sam3.png";
+
+// Sam character
+class Sam {
+  constructor() {
+    this.x = canvas.width / 2;
+    this.y = canvas.height - 100;
+    this.width = 40;
+    this.height = 40;
+    this.speed = 6;
+  }
+
+  draw() {
+    ctx.drawImage(samImg, this.x, this.y, this.width, this.height);
+  }
+
+  update() {
+    if (keys.left && this.x > 0) {
+      this.x -= this.speed;
+    }
+    if (keys.right && this.x < canvas.width - this.width) {
+      this.x += this.speed;
+    }
+  }
+}
+
+// Obstacle class
+class Obstacle {
+  constructor(x, y, image) {
+    this.x = x;
+    this.y = y;
+    this.width = 60;
+    this.height = 60;
+    this.speed = Math.random() * gameSpeed + 1; // Varying speeds
+    this.image = image;
+  }
+
+  draw() {
+    ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+  }
+
+  update() {
+    this.y += this.speed;
+  }
+}
+
+// Projectile class
+class Projectile {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.width = 5;
+    this.height = 16;
+    this.speed = 9;
+  }
+
+  draw() {
+    ctx.fillStyle = "red";
+    ctx.fillRect(this.x, this.y, this.width, this.height);
+  }
+
+  update() {
+    this.y -= this.speed;
+  }
+}
+
+// Key press handling
+const keys = {
+  left: false,
+  right: false
+};
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft") keys.left = true;
+  if (e.key === "ArrowRight") keys.right = true;
+});
+
+document.addEventListener("keyup", (e) => {
+  if (e.key === "ArrowLeft") keys.left = false;
+  if (e.key === "ArrowRight") keys.right = false;
+});
+
+// Touch handling for mobile
+canvas.addEventListener("touchstart", (e) => {
+  const touchX = e.touches[0].clientX;
+  if (touchX < canvas.width / 2) {
+    keys.left = true;
+  } else {
+    keys.right = true;
+  }
+});
+
+canvas.addEventListener("touchend", () => {
+  keys.left = false;
+  keys.right = false;
+});
+
+// Game functions
+function createObstacle() {
+  const x = Math.random() * (canvas.width - 30); // Random x position
+  const imageIndex = Math.floor(Math.random() * obstacleImgs.length);
+  obstacles.push(new Obstacle(x, -30, obstacleImgs[imageIndex]));
+}
+
+function updateObstacles() {
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    obstacles[i].update();
+
+    // Remove obstacles that go off screen
+    if (obstacles[i].y > canvas.height) {
+      obstacles.splice(i, 1);
+    }
+
+    // Game over if Sam hits an obstacle
+    if (
+      sam.x < obstacles[i].x + obstacles[i].width &&
+      sam.x + sam.width > obstacles[i].x &&
+      sam.y < obstacles[i].y + obstacles[i].height &&
+      sam.y + sam.height > obstacles[i].y
+    ) {
+      gameOver();
+    }
+
+    // Check collision with projectile
+    if (projectile) {
+      if (
+        projectile.x < obstacles[i].x + obstacles[i].width &&
+        projectile.x + projectile.width > obstacles[i].x &&
+        projectile.y < obstacles[i].y + obstacles[i].height &&
+        projectile.y + projectile.height > obstacles[i].y
+      ) {
+        // Play sound effect
+        const beepSound = document.getElementById("beepSound");
+        beepSound.currentTime = 0; // Reset sound to beginning
+        beepSound.play();
+
+        // Show score increase
+        showScoreIncrease(obstacles[i].x, obstacles[i].y);
+
+        obstacles.splice(i, 1);
+        projectile = null;
+        score += 100; 
+      }
+    }
+  }
+}
+
+function showScoreIncrease(x, y) {
+  ctx.font = "20px Arial";
+  ctx.fillStyle = "green";
+  ctx.textAlign = "center";
+  ctx.fillText("+100", x, y);
+  setTimeout(() => { // Clear the "+100" after a short delay
+    ctx.clearRect(x - 30, y - 20, 60, 30); // Adjust the area to clear as needed
+  }, 500);
+}
+
+function gameOver() {
+  gameOverFlag = true;
+  gameSpeed = 1;     // Reset game speed
+  obstacles = [];     // Clear obstacles
+
+  const bgMusic = document.getElementById("bgMusic");
+  bgMusic.pause();   // Pause background music
+
+  alert("Oh no! Sam got Sam'd!");
+  score = 0;
+
+  // Reset Sam's position
+  sam.x = canvas.width / 2;
+  sam.y = canvas.height - 100;
+
+  // Restart the game loop after a short delay
+  setTimeout(() => {
+    gameOverFlag = false;
+    bgMusic.play();    // Resume background music
+    gameLoop();
+  }, 1000); // 1-second delay
+}
+
+// Game loop
+function gameLoop() {
+  if (!gameOverFlag) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw game title
+    ctx.font = "20px Arial";
+    ctx.fillStyle = "black";
+    ctx.textAlign = "center";
+    ctx.fillText("Silly lil Sam: the game", canvas.width / 2, 30);
+
+    // Draw score
+    ctx.textAlign = "right";
+    ctx.fillText("Score: " + score, canvas.width - 20, 30);
+
+    // Create obstacles
+    const currentTime = Date.now();
+    if (currentTime - lastObstacleTime > 1000 - gameSpeed * 50) {
+      createObstacle();
+      lastObstacleTime = currentTime;
+    }
+
+    // Create projectile
+    if (currentTime - lastProjectileTime > 2000) {
+      projectile = new Projectile(sam.x + sam.width / 2, sam.y);
+      lastProjectileTime = currentTime;
+    }
+
+    // Update and draw game elements
+    sam.update();
+    sam.draw();
+    updateObstacles();
+    obstacles.forEach((obstacle) => obstacle.draw());
+
+    // Update and draw projectile
+    if (projectile) {
+      projectile.update();
+      projectile.draw();
+
+      if (projectile.y < 0) {
+        projectile = null;
+      }
+    }
+
+    // Increase score
+    score += 10;
+
+    // Gradually increase difficulty
+    gameSpeed += 0.006;
+
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+// Initialize game
+sam = new Sam();
+
+// Start background music
+const bgMusic = document.getElementById("bgMusic");
+bgMusic.volume = 0.2; // Adjust volume as needed
+bgMusic.play();
+
+gameLoop();
+</script>
+
+</body>
+</html>
